@@ -47,8 +47,8 @@ class Encoder(nn.Module):
             self.linear2 = nn.Linear(self.F, self.H)
             self.dropout = nn.Dropout(0.1)
             self.layernorm = nn.LayerNorm(self.H) # add normalized shape
-        else:
-            WQ = 
+        #else:
+            #WQ = 
 
             
     def multi_head_self_attention(self, X: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
