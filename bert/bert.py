@@ -28,6 +28,8 @@ while count < 12:
     for name, param in params:
         if re.match(regex_count, name):
             layer_weights_sublist.append([name, param])
+            print(name)
+            print(param.shape)
             
 
     layer_weights_dict[str(count)] = layer_weights_sublist
@@ -57,7 +59,7 @@ class BERT(nn.Module):
         # Create a list of weights per encoder, and then create an encoder based on them, i goes from 0 to 11
 
         for i in range(0, self.L):
-            e = Encoder("base", batch_size, seq_len, layer_weights_dict[str(i)])
+            e = Encoder("base", batch_size, seq_len, 0) # layer_weights_dict[str(i)]
             self.es.append(e)
 
         # Input embeddings
@@ -89,4 +91,4 @@ class BERT(nn.Module):
 
 BERT_Model = BERT()
 out = BERT_Model("hello world")
-# print(out)
+print(out)

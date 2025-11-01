@@ -31,14 +31,19 @@ class Encoder(nn.Module):
                 WK = torch.zeros((self.H, self.H // self.A))
                 WV = torch.zeros((self.H, self.H // self.A))
 
+                bQ = torch.zeros(64,)
+                bK = torch.zeros(64,)
+                bV = torch.zeros(64,)
+
                 nn.init.xavier_normal_(WQ)
                 nn.init.xavier_normal_(WK)
                 nn.init.xavier_normal_(WV)
-                self.W.append([WQ, WK, WV])
+                self.W.append([WQ, WK, WV, bQ, bK, bV])
 
 
             # dim(W_O) = h*d_v x d_model = 12*64 x 768 = 768 x 768
             self.WO = torch.zeros((self.H, self.H))
+            self.bO = torch.zeros((self.H,))
             nn.init.xavier_normal_(self.WO)
 
             # define dropout, linear layers, layernorm, and GELU
@@ -48,7 +53,7 @@ class Encoder(nn.Module):
             self.dropout = nn.Dropout(0.1)
             self.layernorm = nn.LayerNorm(self.H) # add normalized shape
         #else:
-            #WQ = 
+           # WQ = 
 
             
     def multi_head_self_attention(self, X: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
@@ -58,11 +63,14 @@ class Encoder(nn.Module):
             WQ = head_i[0]
             WK = head_i[1]
             WV = head_i[2]
+            bQ = head_i[3]
+            bK = head_i[4]
+            bV = head_i[5]
             
             # Q is (N x (self.H / self.A))
-            Q = X@WQ
-            K = X@WK
-            V = X@WV
+            Q = X@WQ + bQ
+            K = X@WK + bK
+            V = X@WV + bV
 
 
             scores = (Q@K.transpose(1, 2))/sqrt(self.H / self.A)
@@ -75,7 +83,7 @@ class Encoder(nn.Module):
             Zs.append(Z) 
 
         # Concat attention output from each head.
-        O = torch.concat(Zs, dim=-1)@self.WO
+        O = torch.concat(Zs, dim=2)@self.WO  + self.bO
         return O
     
     def feed_forward_network(self, X: torch.Tensor) -> torch.Tensor:
