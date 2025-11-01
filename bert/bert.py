@@ -28,9 +28,6 @@ while count < 12:
     for name, param in params:
         if re.match(regex_count, name):
             layer_weights_sublist.append([name, param])
-            print(name)
-            print(param.shape)
-            
 
     layer_weights_dict[str(count)] = layer_weights_sublist
     count += 1
@@ -44,6 +41,7 @@ class BERT(nn.Module):
         super().__init__()
         # the number of encoder blocks (BASE)
         self.L = 12
+        self.seq_len = seq_len
         
         # Tokenizer & Embeddings
         self.bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
@@ -59,7 +57,7 @@ class BERT(nn.Module):
         # Create a list of weights per encoder, and then create an encoder based on them, i goes from 0 to 11
 
         for i in range(0, self.L):
-            e = Encoder("base", batch_size, seq_len, 0) # layer_weights_dict[str(i)]
+            e = Encoder("base", batch_size, seq_len, layer_weights_dict[str(i)])
             self.es.append(e)
 
         # Input embeddings
@@ -75,7 +73,8 @@ class BERT(nn.Module):
         ## Embeddings layers
         token_embeddings = self.word_embeddings(batch_ids)
         segment_embeddings = self.segment_embeddings(token_type_ids)
-        embeddings_with_position = self.positional_embeddings(token_embeddings.to(torch.int32) + segment_embeddings.to(torch.int32))
+        position_embeddings = self.positional_embeddings(torch.arange(self.seq_len).unsqueeze(0))
+        embeddings_with_position = token_embeddings + segment_embeddings + position_embeddings 
         embedding_normalized = self.embedding_layernorm(embeddings_with_position)
         final_embedding = self.embedding_dropout(embedding_normalized)
 
@@ -90,5 +89,4 @@ class BERT(nn.Module):
     
 
 BERT_Model = BERT()
-out = BERT_Model("hello world")
-print(out)
+out = BERT_Model(["hello world"])

@@ -10,7 +10,7 @@ class Encoder(nn.Module):
 
         # self.N is batch_size
         self.N = batch_size
-        self.seq_len = seq_len # POLISH
+        self.seq_len = seq_len 
         # self.A is number of heads
         self.A = None
         # self.H is hidden size
@@ -23,6 +23,15 @@ class Encoder(nn.Module):
             self.H = 768
            
         self.W = []
+
+        # Define dropout, linear layers, layernorm, and GELU           
+        self.linear1 = nn.Linear(self.H, self.F)
+        self.gelu = nn.GELU()
+        self.linear2 = nn.Linear(self.F, self.H)
+        self.layernorm_attention = nn.LayerNorm(self.H) 
+        self.dropout = nn.Dropout(0.1)
+        self.layernorm_output = nn.LayerNorm(self.H)
+
         # Initialize weights for multi-head attention
         if pretrained_weights == 0:
             for i in range(0, self.A):
@@ -46,45 +55,74 @@ class Encoder(nn.Module):
             self.bO = torch.zeros((self.H,))
             nn.init.xavier_normal_(self.WO)
 
-            # define dropout, linear layers, layernorm, and GELU
-            self.linear1 = nn.Linear(self.H, self.F)
-            self.gelu = nn.GELU()
-            self.linear2 = nn.Linear(self.F, self.H)
-            self.dropout = nn.Dropout(0.1)
-            self.layernorm = nn.LayerNorm(self.H) # add normalized shape
-        #else:
-           # WQ = 
+        else:
+           with torch.no_grad():
+            self.WQ = pretrained_weights[0][1]
+            self.bQ = pretrained_weights[1][1]
+            self.WK = pretrained_weights[2][1]
+            self.bK = pretrained_weights[3][1]
+            self.WV = pretrained_weights[4][1]
+            self.bV = pretrained_weights[5][1]
+            self.WO = pretrained_weights[6][1]
+            self.bO = pretrained_weights[7][1]
+            self.layernorm_attention.weight.copy_(pretrained_weights[8][1])
+            self.layernorm_attention.bias.copy_(pretrained_weights[9][1])
+            self.linear1.weight.copy_(pretrained_weights[10][1])
+            self.linear1.bias.copy_(pretrained_weights[11][1])
+            self.linear2.weight.copy_(pretrained_weights[12][1])
+            self.linear2.bias.copy_(pretrained_weights[13][1])
+            self.layernorm_output.weight.copy_(pretrained_weights[14][1])
+            self.layernorm_output.bias.copy_(pretrained_weights[15][1])
 
             
     def multi_head_self_attention(self, X: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        # the output for each head
-        Zs = []
-        for head_i in self.W:
-            WQ = head_i[0]
-            WK = head_i[1]
-            WV = head_i[2]
-            bQ = head_i[3]
-            bK = head_i[4]
-            bV = head_i[5]
+        if self.pretrained_weights == 0:
+            # the output for each head
+            Zs = []
+            for head_i in self.W:
+                WQ = head_i[0]
+                WK = head_i[1]
+                WV = head_i[2]
+                bQ = head_i[3]
+                bK = head_i[4]
+                bV = head_i[5]
             
-            # Q is (N x (self.H / self.A))
-            Q = X@WQ + bQ
-            K = X@WK + bK
-            V = X@WV + bV
+                # Q is (N x (self.H / self.A))
+                Q = X@WQ + bQ
+                K = X@WK + bK
+                V = X@WV + bV
 
 
+                scores = (Q@K.transpose(1, 2))/sqrt(self.H / self.A)
+                scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf')) # adjust the ten so it's not hard-coded
+                attn_weights = nn.functional.softmax(scores_masked, dim=-1)
+            
+                attn_weights = self.dropout(attn_weights)
+
+                Z = attn_weights@V
+                Zs.append(Z) 
+
+            # Concat attention output from each head.
+            O = torch.concat(Zs, dim=2)@self.WO  + self.bO
+            return O
+        
+        else:
+            Q = X@self.WQ + self.bQ
+            K = X@self.WK + self.bK
+            V = X@self.WV + self.bV
+
+            # Split to (batch, seq_len, hidden_size // number of heads)
+            print(V.view(self.N, self.seq_len, self.H // self.A).shape) 
             scores = (Q@K.transpose(1, 2))/sqrt(self.H / self.A)
-            scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf'))
+            scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf')) # adjust the ten so it's not hard-coded
             attn_weights = nn.functional.softmax(scores_masked, dim=-1)
-            
+
             attn_weights = self.dropout(attn_weights)
-
             Z = attn_weights@V
-            Zs.append(Z) 
+            O = Z@self.WO + self.bO
 
-        # Concat attention output from each head.
-        O = torch.concat(Zs, dim=2)@self.WO  + self.bO
-        return O
+            return O
+
     
     def feed_forward_network(self, X: torch.Tensor) -> torch.Tensor:
         X = self.linear1(X)
@@ -96,10 +134,10 @@ class Encoder(nn.Module):
         # X dimension is (N, self.H)
         X1 = self.multi_head_self_attention(X, mask) # (N, self.H)
         X = self.dropout(X1) + X
-        X = self.layernorm(X)
+        X = self.layernorm_attention(X)
         X2 = self.feed_forward_network(X) # (N, self.H)
         X = self.dropout(X2) + X
-        X = self.layernorm(X)
+        X = self.layernorm_output(X)
 
         return X
     
