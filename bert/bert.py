@@ -54,8 +54,7 @@ class BERT(nn.Module):
 
         # Encoder blocks, 12 for BASE
         self.es = []
-        # Create a list of weights per encoder, and then create an encoder based on them, i goes from 0 to 11
-
+        # Create a list of weights per encoder, and then create an encoder based on them, i goes from 0 to 11\
         for i in range(0, self.L):
             e = Encoder("base", batch_size, seq_len, layer_weights_dict[str(i)])
             self.es.append(e)
@@ -90,3 +89,4 @@ class BERT(nn.Module):
 
 BERT_Model = BERT()
 out = BERT_Model(["hello world"])
+print(out)

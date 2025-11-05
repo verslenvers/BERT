@@ -94,7 +94,7 @@ class Encoder(nn.Module):
 
 
                 scores = (Q@K.transpose(1, 2))/sqrt(self.H / self.A)
-                scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf')) # adjust the ten so it's not hard-coded
+                scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf')) # adjust the ten so it's not hard-coded, should be seq_len. 
                 attn_weights = nn.functional.softmax(scores_masked, dim=-1)
             
                 attn_weights = self.dropout(attn_weights)
@@ -107,18 +107,27 @@ class Encoder(nn.Module):
             return O
         
         else:
+            # (1, 10, 768) or (batch_size, seq_len, hidden_size)
             Q = X@self.WQ + self.bQ
             K = X@self.WK + self.bK
             V = X@self.WV + self.bV
 
-            # Split to (batch, seq_len, hidden_size // number of heads)
-            print(V.view(self.N, self.seq_len, self.H // self.A).shape) 
-            scores = (Q@K.transpose(1, 2))/sqrt(self.H / self.A)
-            scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf')) # adjust the ten so it's not hard-coded
-            attn_weights = nn.functional.softmax(scores_masked, dim=-1)
+            # Reshape to (batch, number of heads, seq_len, hidden_size // number of heads) ==> (N, 12, 10, 64)
+            Q = Q.view(Q.shape[0], self.A, self.seq_len, self.H // self.A)
+            K = K.view(K.shape[0], self.A, self.seq_len, self.H // self.A)
+            V = V.view(V.shape[0], self.A, self.seq_len, self.H // self.A)
+            
+            # Tranpose so the last two dims of each tensor can match during matrix multiplication
+            scores = (Q@K.transpose(2, 3))/sqrt(self.H / self.A) # (batch_size, num_heads, seq_len, seq_len)
+            # Mask shape is (1, 10) ==> should be [batch_size, 1, 1, seq_len] # for brodcasting
+            scores_masked = scores.masked_fill(mask.view(Q.shape[0], 1, 1, self.seq_len) == 0, float('-inf')) # (1, 1, 1, 10)
 
-            attn_weights = self.dropout(attn_weights)
+            attn_weights = nn.functional.softmax(scores_masked, dim=-1)
+            attn_weights = self.dropout(attn_weights) # (batch_size, num_heads, seq_len, seq_len)
+
+            # Concatenate weights together
             Z = attn_weights@V
+            Z = Z.view(Z.shape[0], self.seq_len, self.H)
             O = Z@self.WO + self.bO
 
             return O
