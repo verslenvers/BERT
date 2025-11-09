@@ -59,9 +59,9 @@ class BERT(nn.Module):
         # Output layer
         self.output_qa = nn.Linear(768, 2)
 
-    def forward(self, X):
+    def forward(self, question, context):
         ## Tokenize the Input
-        batch = self.bert_tokenizer(X, max_length=self.seq_len, truncation=True, padding="max_length", return_offsets_mapping=True) # normally max_length=512, stride=50
+        batch = self.bert_tokenizer(question, context, max_length=self.seq_len, truncation=True, padding="max_length", return_offsets_mapping=True) # normally max_length=512, stride=50
         batch_ids = torch.tensor(batch["input_ids"])
         attention_mask = torch.tensor(batch["attention_mask"])
         token_type_ids = torch.tensor(batch["token_type_ids"])
@@ -84,8 +84,4 @@ class BERT(nn.Module):
         start_logits = logits[:, :, 0] # (batch_size, seq_len)
         end_logits = logits[:, :, 1] # (batch_size, seq_len)
         return start_logits, end_logits
-        
-
-BERT_Model = BERT()
-outputs = BERT_Model(["hello world?", "I believe in hello world"])
-print(outputs)
+    
