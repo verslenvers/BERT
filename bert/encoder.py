@@ -92,7 +92,6 @@ class Encoder(nn.Module):
                 K = X@WK + bK
                 V = X@WV + bV
 
-
                 scores = (Q@K.transpose(1, 2))/sqrt(self.H / self.A)
                 scores_masked = scores.masked_fill(mask.view(10, 1, 1) == 0, float('-inf')) # adjust the ten so it's not hard-coded, should be seq_len. 
                 attn_weights = nn.functional.softmax(scores_masked, dim=-1)
@@ -152,11 +151,3 @@ class Encoder(nn.Module):
     
     def get(self):
         return self.pretrained_weights
-
-"""
-Testing:
-encoder = Encoder("base", 2, 10)
-x = torch.randn(2, 10, 768)  # batch=2, seq_len=10
-mask = torch.zeros(2, 10, 768)
-out = encoder(x, mask)
-"""
