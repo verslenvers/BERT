@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 from math import sqrt
+from lora import LoRA
+import torch.nn.utils.parametrize as parametrize
 
 class Encoder(nn.Module):
 
@@ -36,24 +38,31 @@ class Encoder(nn.Module):
         if pretrained_weights == 0:
             for i in range(0, self.A):
                 # d_model / h (or self.A) = 768 / 12 = 64 
-                WQ = torch.zeros((self.H, self.H // self.A))
-                WK = torch.zeros((self.H, self.H // self.A))
-                WV = torch.zeros((self.H, self.H // self.A))
+                WQ = nn.Parameter(torch.zeros((self.H, self.H // self.A)))
+                WK = nn.Parameter(torch.zeros((self.H, self.H // self.A)))
+                WV = nn.Parameter(torch.zeros((self.H, self.H // self.A)))
 
-                bQ = torch.zeros(64,)
-                bK = torch.zeros(64,)
-                bV = torch.zeros(64,)
+                bQ = nn.Parameter(torch.zeros(64,))
+                bK = nn.Parameter(torch.zeros(64,))
+                bV = nn.Parameter(torch.zeros(64,))
 
                 nn.init.xavier_normal_(WQ)
                 nn.init.xavier_normal_(WK)
                 nn.init.xavier_normal_(WV)
+
+                ## Parametrization
+                parametrize.register_parametrization(WQ, 'WQ', LoRA())
+                parametrize.register_parametrization(WK, 'WK', LoRA())
+                parametrize.register_parametrization(WV, 'WV', LoRA())
+
                 self.W.append([WQ, WK, WV, bQ, bK, bV])
 
 
             # dim(W_O) = h*d_v x d_model = 12*64 x 768 = 768 x 768
-            self.WO = torch.zeros((self.H, self.H))
-            self.bO = torch.zeros((self.H,))
+            self.WO = nn.Parameter(torch.zeros((self.H, self.H)))
+            self.bO = nn.Parameter(torch.zeros((self.H,)))
             nn.init.xavier_normal_(self.WO)
+            parametrize.register_parametrization(self.WO, 'WO', LoRA())
 
         else:
            with torch.no_grad():
