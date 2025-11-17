@@ -47,14 +47,11 @@ class BERT(nn.Module):
         self.embedding_dropout = nn.Dropout(p=0.1)
 
         # Encoder blocks, 12 for BASE
-        self.es = []
+        self.encoders = nn.ModuleList()
         # Create a list of weights per encoder, and then create an encoder based on them, i goes from 0 to 11
         for i in range(0, self.L):
             e = Encoder("base", batch_size, seq_len, layer_weights_dict[str(i)])
-            self.es.append(e)
-
-        # Input embeddings
-        self.input_embedding = nn.Embedding(512, 768)
+            self.encoders.append(e)
 
         # Output layer
         self.output_qa = nn.Linear(768, 2)
@@ -84,4 +81,3 @@ class BERT(nn.Module):
         start_logits = logits[:, :, 0] # (batch_size, seq_len)
         end_logits = logits[:, :, 1] # (batch_size, seq_len)
         return start_logits, end_logits
-    

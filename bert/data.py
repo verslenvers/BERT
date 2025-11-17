@@ -111,6 +111,6 @@ validation_dataset = dataset["validation"].map(
     batched=True,
     remove_columns=dataset["validation"].column_names,
 )
-print(dataset["validation"].column_names) # (id, title, context, question, answers)
-print(train_dataset.shape) # (88524, 5)
-print(validation_dataset.shape) # (10570, 5)
+#print(dataset["validation"].column_names) # (id, title, context, question, answers)
+#print(train_dataset.shape) # (88524, 5)
+#print(validation_dataset.shape) # (10570, 5)
